@@ -82,25 +82,29 @@ void PnInit(void)
 		exit(1);
 	}
 
-    if ((fp=fopen(CONFIG_FILENAME, "r")) == NULL) {
-        fprintf(stderr, "Failed to open config file " CONFIG_FILENAME "\n");
-        exit(EXIT_FAILURE);
-    }
-    while(fgets(buf, CONFIG_LINE_BUFFER_SIZE, fp) > 0) {
-        if (buf[0] == '#' || strlen(buf) < 4) {
-            continue;
+    if (fp=fopen(CONFIG_FILENAME, "r")) {
+        while(fgets(buf, CONFIG_LINE_BUFFER_SIZE, fp) > 0) {
+            if (buf[0] == '#' || strlen(buf) < 4) {
+                continue;
+            }
+            int p = atoi(buf);
+            char c[10];
+            uint8_t u[PORT_UUID_SIZE] = {0};
+            if (sscanf(buf, "%s %hhx:%hhx:%hhx:%hhx:%hhx:%hhx\n",
+                    c, &(u[0]), &(u[1]), &(u[2]), &(u[3]), &(u[4]), &(u[5])) == 7) {
+                addnum(p,u);
+            } else {
+                printf("Wrong format %s\n", buf);
+            }
         }
-        int p = atoi(buf);
-        char c[10];
-        uint8_t u[PORT_UUID_SIZE] = {0};
-        if (sscanf(buf, "%s %x:%x:%x:%x:%x:%x\n",
-        		c, &(u[0]), &(u[1]), &(u[2]), &(u[3]), &(u[4]), &(u[5])) == 7) {
-        	addnum(p,u);
-        } else {
-        	printf("Wrong format %s\n", buf);
+        fclose(fp);
+    } else {
+        // First run
+        if ((fp=fopen(CONFIG_FILENAME, "w")) != NULL) {
+            fprintf(fp,"# [port] [UUID]\n");
+            fclose(fp);
         }
     }
-    fclose(fp);
 }
 
 void PnStore(int port, uint8_t* u)
