@@ -27,6 +27,8 @@ typedef struct {
 	uint16_t port;
 	canid_t canid;
 	int pingcount;
+	// This workaround for Klipper only - do not write data until connect
+	int active;
 } tPortId;
 
 // p[0] unused and VportFd[0] means CAN socket

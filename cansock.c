@@ -56,6 +56,7 @@ static int CanVport(int portid)
 		if (ports.p[i].port == portid) {
 			// Assign the same virtual port for re-initialized CAN
 			fprintf(stderr, "Unexpected reset: /tmp/ttyCAN%d\n", portid);
+			ports.p[i].active = 0;
 			return i;
 		}
 	}
@@ -75,6 +76,7 @@ static int CanVport(int portid)
 	ports.p[ports.portptr].canid = portid+PKT_ID_CTL_FILTER;
 	ports.p[ports.portptr].port = portid;
 	ports.p[ports.portptr].pingcount = PINGS_BEFORE_DISCONNECT;
+	ports.p[ports.portptr].active = 0;
 	ports.VportFd[ports.portptr].revents = 0;
 
 	// allocate virtual port
@@ -156,7 +158,7 @@ void *CanRxThread( void *ptr )
 					} else {
 						for(i=1; i<ports.portptr; i++) {
 							if (ports.p[i].canid == (frame.can_id - 1)) {
-								if (frame.can_dlc > 0)
+								if (frame.can_dlc > 0 && ports.p[i].active)
 									write(ports.VportFd[i].fd, frame.data, frame.can_dlc);
 								// refresh channel activity
 								ports.p[i].pingcount = PINGS_BEFORE_DISCONNECT;
@@ -173,6 +175,10 @@ void *CanRxThread( void *ptr )
 					if (ports.VportFd[i].revents) {
 						ssize_t rl = read (ports.VportFd[i].fd, rxbuf, CAN_DATA_SIZE);
 						if(rl>0) {
+						    for(int j=0;j<rl;j++) {
+						        if(rxbuf[j] == 0x7E) // End of packet indicator
+						            ports.p[i].active = 1; // Now we can send responses
+						    }
 							//printf("Buf %d, %d\n", ports.p[i].canid, rl);
 							CanSockSend(ports.p[i].canid, rl, rxbuf);
 						}
