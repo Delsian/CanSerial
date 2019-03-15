@@ -19,3 +19,16 @@ frames with id 0x17F+(2 x PortNumber)
 
 After assigning port to slave, Emulator creates /tmp/ttyCANxx node emulating serial port.
 
+## Build procedure
+
+```
+git clone git@github.com:Delsian/CanSerial.git
+cd CanSerial
+cmake .
+make
+./canserial
+```
+
+
+If you get "Socket init error: xxx" - check your CAN configuration.
+
