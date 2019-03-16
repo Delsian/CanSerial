@@ -19,11 +19,15 @@
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/stat.h>
+#include <sys/inotify.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 
 #include "cansock.h"
 #include "portnumber.h"
+
+#define EVENT_SIZE  ( sizeof (struct inotify_event) )
+#define EVENT_BUF_LEN     ( 1024 * ( EVENT_SIZE + 16 ) )
 
 /* CAN raw socket */
 static int Socket;
@@ -32,12 +36,14 @@ static int threadexit = 0;
 static tPorts ports;
 static int sock;
 static int pingptr = 0;
+static int Inotify;
 
 static void CanVportClose(tPortId *p) {
 	int res;
 
 	char fname[15];
 	sprintf(fname,"/tmp/ttyCAN%d", p->port);
+	inotify_rm_watch(Inotify, p->watch);
 	res = unlink(fname);
 	if (res == 0) {
 		printf("Unlink port %d from %s\n", p->port, fname);
@@ -55,8 +61,7 @@ static int CanVport(int portid)
 	for(i=1; i<ports.portptr; i++) {
 		if (ports.p[i].port == portid) {
 			// Assign the same virtual port for re-initialized CAN
-			fprintf(stderr, "Unexpected reset: /tmp/ttyCAN%d\n", portid);
-			ports.p[i].active = 0;
+			fprintf(stderr, "Device reset: /tmp/ttyCAN%d\n", portid);
 			return i;
 		}
 	}
@@ -115,6 +120,8 @@ static int CanVport(int portid)
     ports.VportFd[ports.portptr].fd = fd;
     ports.VportFd[ports.portptr].events = POLLIN;
 
+    ports.p[ports.portptr].watch = inotify_add_watch(Inotify, fname, IN_OPEN|IN_CLOSE);
+
     ports.portptr++;
     return ports.portptr-1;
 }
@@ -143,6 +150,7 @@ void *CanRxThread( void *ptr )
 	int ret;
 	tCanFrame frame;
 	uint8_t rxbuf[CAN_DATA_SIZE];
+    char ev_buf[EVENT_BUF_LEN];
 
 	while (threadexit==0) {
 		ret = poll(ports.VportFd, ports.portptr, 1000);
@@ -186,6 +194,27 @@ void *CanRxThread( void *ptr )
 				}
 			}
 		}
+        ssize_t ev = read( Inotify, ev_buf, EVENT_BUF_LEN );
+        if ( ev > 0 ) {
+        	for (char *p = ev_buf; p < ev_buf + ev; ) {
+        		struct inotify_event *event = (struct inotify_event *) p;
+        		for(i=1; i<ports.portptr; i++) {
+        			if(ports.p[i].watch == event->wd) {
+        				if ( event->mask & IN_OPEN ) {
+        					printf("Open %d\n", ports.p[i].canid);
+        					ports.p[i].active = 1;
+        					// Send reset to MCU
+        					CanSockSend(PKT_ID_UUID, 2, (uint8_t*) &(ports.p[i].canid));
+        				} else if ( event->mask & IN_CLOSE ) {
+        					printf("Close %d\n", ports.p[i].canid);
+        					ports.p[i].active = 0;
+        				}
+        				break;
+        			}
+        		}
+        		p += EVENT_SIZE + event->len;
+        	}
+        }
 	}
 
 	printf("Close ports\n");
@@ -286,6 +315,13 @@ int CanSockInit(void)
 	}
 	ports.VportFd[0].fd = sock;
 	ports.VportFd[0].events = POLLIN;
+
+	// Inotify for port open/close
+	Inotify = inotify_init1(IN_NONBLOCK|IN_CLOEXEC);
+	 if (Inotify == -1) {
+		 fprintf(stderr, "unable to create inotify fd\n");
+		 return EINVAL;
+	 }
 
 	// Create RX thread
 	if( (retval = pthread_create( &RxTh, NULL, CanRxThread, NULL)) > 0 )

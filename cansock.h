@@ -3,7 +3,7 @@
 
 #include <linux/can.h>
 
-// Read UUID  (6bytes)
+// Read UUID or reset MCU (6bytes)
 #define PKT_ID_UUID (0x321)
 // Set address (2bytes) to UUID (6b)
 #define PKT_ID_SET (0x322)
@@ -27,8 +27,8 @@ typedef struct {
 	uint16_t port;
 	canid_t canid;
 	int pingcount;
-	// This workaround for Klipper only - do not write data until connect
-	int active;
+	int active; // Is port open
+	int watch; // inotify watch
 } tPortId;
 
 // p[0] unused and VportFd[0] means CAN socket
