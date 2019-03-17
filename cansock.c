@@ -172,10 +172,13 @@ void *CanRxThread( void *ptr )
 								ports.p[i].pingcount = PINGS_BEFORE_DISCONNECT;
 								break;
 							}
-							if ( i+1 == ports.portptr) {
-								printf("Packet id unknown %d\n", frame.can_id);
-							}
 						}
+                        if ( i == ports.portptr) {
+                            printf("Packet id unknown %d\n", frame.can_id);
+                            // Looks like lost hanshake, try to re-init
+                            uint16_t txaddr = frame.can_id - 1;
+                            CanSockSend(PKT_ID_UUID, 2, (uint8_t*) &(txaddr));
+                        }
 					}
 				}
 			} else {
