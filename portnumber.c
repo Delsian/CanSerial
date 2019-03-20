@@ -15,7 +15,7 @@
 #include "portnumber.h"
 
 #define CONFIG_LINE_BUFFER_SIZE 64
-#define CONFIG_FILENAME "canuuids.cfg"
+#define CONFIG_FILENAME "/var/tmp/canuuids.cfg"
 
 typedef struct {
 	uint16_t port;
@@ -103,7 +103,9 @@ void PnInit(void)
         if ((fp=fopen(CONFIG_FILENAME, "w")) != NULL) {
             fprintf(fp,"# [port] [UUID]\n");
             fclose(fp);
-        }
+        } else {
+	    perror(CONFIG_FILENAME);
+	}
     }
 }
 
@@ -116,6 +118,8 @@ void PnStore(int port, uint8_t* u)
 		printuuid(fp, u);
 		fprintf(fp,"\n");
 		fclose(fp);
+	} else {
+		perror("Can't store config " CONFIG_FILENAME);
 	}
 }
 
