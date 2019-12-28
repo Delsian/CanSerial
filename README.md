@@ -32,3 +32,13 @@ make
 
 If you get "Socket init error: xxx" - check your CAN configuration.
 
+
+## Run CanSerial as service
+
+
+```
+$ sudo cp canserial.service /lib/systemd/system/canserial.service
+$ sudo systemctl daemon-reload
+$ sudo systemctl enable canserial.service
+$ sudo systemctl start canserial.service
+```
