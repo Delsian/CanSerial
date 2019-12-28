@@ -1,0 +1,10 @@
+[Unit]
+Description=Serial over CAN emulator
+After=multi-user.target
+
+[Service]
+Type=idle
+ExecStart=/home/pi/CanSerial/canserial
+
+[Install]
+WantedBy=multi-user.target
